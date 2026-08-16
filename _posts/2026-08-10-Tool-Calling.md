@@ -2,7 +2,7 @@
 layout: post
 title:  "Tool Calling"
 date:   2026-08-09 19:17:50 -0400
-categories: jekyll update
+categories: tool-calling ollama ai-models llm
 ---
 
 # Function Calling with Local LLMs: A Working Walkthrough
@@ -103,54 +103,149 @@ role='assistant' content='The sum of 47 and 89 is 136.' thinking=None images=Non
 
 
 ## 3. Closing the loop — feeding results back
-Once model returns these results its responsibility of our code to make the tool can and feed the results back to the model. Let's see how it work
+Once model returns these results its responsibility of our code to make the tool can and feed the results back to the model. Let's see how it works.
 
-Data to include:
-- After calling `get_weather("Tokyo")` yourself and getting back "The weather in Tokyo is 22°C and sunny," that result was appended to the conversation as a `tool` role message
-- Model then produced a natural sentence combining the result: confirms the loop is genuinely two round-trips, not one
+We have alredy seen that model returns the `tool_calls` back with the details of function name and argument details. So, step 1 is we just simply calls that tool with the provided argument.
+Here is a sample code for it:
+```python
+for tool_call in response["message"]["tool_calls"]:
+    tool_name = tool_call["function"]["name"]
+    tool_args = tool_call["function"]["arguments"]
+    if tool_name == "get_weather":
+        city = tool_args.get("city")
+        if city:
+            results = get_weather(city)
+```
 
-## 4. Correctly declining to use a tool
-[Vikas: this is an easy thing to get wrong when building agents — the model needs to recognize when *no* tool applies.]
+After this we pass this back to Model to get final formatted natural sentenced answer. For example you might have asked two questions, so this way you get one answer from tool and one from model. So, our steps are:
+1. Ask model our questions by passing tools.
+2. Model returns list of tools.
+3. We call tools manually.
+4. We collect original quesion, model response, tool results and pass everything back to the model.
+5. Then model gives us back the final answer.
 
-Data to include:
-- Prompt: "Where is Tokyo?" with both tools still available → model answered directly in text, no tool call, even though `get_weather` existed and mentioned Tokyo
-- Prompt: "What's the capital of France?" → same, answered directly, ignored irrelevant tools
-- Point worth making: having tools available doesn't force their use — the model is weighing relevance, at least in these clear-cut cases
+```python
+# Step 1: As the question.
+question = "What is 47 plus 89? and how is weather in Tokyo?"
 
-## 5. Multiple tool calls in one turn
-[Vikas: cover the parallel-call case.]
+response = client.chat(
+    model="qwen2.5:7b",
+    messages=[{"role": "user", "content": question}],
+    tools=tools
+)
 
-Data to include:
-- Prompt: "What is 47 plus 89? and how is weather in Tokyo?" → model returned *two* tool calls in a single response (`add_numbers` and `get_weather`), not one at a time
-- Your code has to loop through all returned tool calls, execute each, and append all results before asking for the final answer — a detail that's easy to miss if you only handle the single-tool-call case
+# Step 2: Model's first respons include tools (if there are any)
+message = response["message"]
 
-## 6. Structured output — a different but related capability
-[Vikas: distinguish this from tool calling — no "calling" happens here, the model is just constrained to emit JSON matching a schema.]
+# Build up the conversation history as we go (Part of Step 4)
+messages = [
+    {"role": "user", "content": question},
+    {"role": "assistant", "content": "", "tool_calls": message.tool_calls}
+]
 
-Data to include:
-- Used `qwen2.5:14b-instruct` with a JSON schema (name, age, occupation) and `format=schema` — model returned syntactically valid JSON on the first attempt
-- But: syntactically valid isn't the same as *correct*. On one run, `occupation` came back with a stray smart-quote character and trailing artifacts (`"software engineer", '`) — parsed as valid JSON structurally but wrong content
-- This is why validation needs to check content, not just "did `json.loads()` succeed"
+# Step 3: Execute each tool call and append its result
+for tool_call in message.tool_calls:
+    name = tool_call.function.name
+    args = tool_call.function.arguments
+    
+    if name == "get_weather":
+        result = get_weather(args["city"])
 
-## 7. Building a validate-and-retry wrapper
-[Vikas: describe the pattern, not just the code — why content-level checks matter.]
+    # Here we can add logic for any additional tools we might have.
+    
+    messages.append({"role": "tool", "content": result}) # Part of Step 4
 
-Data to include:
-- Wrapper checked: name is alphabetic and non-empty, occupation is alphanumeric/whitespace only, age is an integer in a sane range (0-120)
-- On a real run, attempt 1 failed content validation (malformed occupation string) even though JSON parsing succeeded; attempt 2 passed
-- Takeaway: a validation layer that only checks "is this valid JSON" will silently let through structurally-fine-but-wrong data — worth stating this as a general principle, not just specific to this test
+# Step 5: Now ask for the final natural-language answer
+follow_up = client.chat(
+    model="qwen2.5:7b",
+    messages=messages,
+    tools=tools
+)
 
-## 8. What this sets up
-[Vikas: 2-3 sentences bridging to Write-up #2 — you now had a working loop and a validation habit, which is what let you notice something was wrong when the failure-mode testing produced empty responses.]
+print(follow_up["message"]["content"])
+```
 
----
-### Appendix: reference summary (for your writing, cut or keep in final piece)
+Model Response:
+```
+The weather in Tokyo is currently 22°C and sunny.
 
-| Capability tested | Result |
-|---|---|
-| Single tool call, correct routing | ✅ Correct tool + arguments |
-| No-tool-needed recognition | ✅ Declined tool use twice |
-| Parallel multi-tool calls | ✅ Two tool calls in one response |
-| Full execute-and-respond loop | ✅ Final answer combined both results |
-| Structured output (schema-constrained) | ⚠️ Valid JSON, but content occasionally malformed |
-| Retry-with-content-validation | ✅ Caught and recovered from bad content |
+For your math question, 47 plus 89 equals 136.
+```
+
+
+## 4. Multiple tool calls in one turn
+So, far we have seen a single tool call, but whatever we have learned so far can be easily modified to support multiple tool calls. To support this let's add anotehr simple tool `add_numbers`.
+
+```python
+def add_numbers(a: float, b: float) -> str:
+    return str(a + b)
+```
+We will need to modify our `tools` list to include this tool as well
+
+```python
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather for a given city",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "The city name"}
+                },
+                "required": ["city"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_numbers",
+            "description": "Add two numbers together and return the sum",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "a": {"type": "number", "description": "The first number"},
+                    "b": {"type": "number", "description": "The second number"}
+                },
+                "required": ["a", "b"]
+            }
+        }
+    }
+]
+```
+
+Now if we repeat the same thing as what we did in the section "Closing the Loop" by just modifying tool calling loop with the following
+```python
+# Execute each tool call and append its result
+for tool_call in message.tool_calls:
+    name = tool_call.function.name
+    args = tool_call.function.arguments
+    
+    if name == "get_weather":
+        result = get_weather(args["city"])
+    elif name == "add_numbers":    # << Here we have addded our 2nd tool >>
+            result = add_numbers(args["a"], args["b"])
+    
+    messages.append({"role": "tool", "content": result})
+
+```
+We get a slightly different output:
+```
+The sum of 47 and 89 is 136. 
+
+Currently, the weather in Tokyo is 22°C and sunny.
+```
+
+Note: It doesn't say anymore that "For your math question....". Becasue both results are not coming back from our tool calls.
+
+
+So, what we saw here is a Model can:
+- determine when to use a tool.
+- determine which tool to use.
+- determine when not to use a tool.
+- also use a tool along with its own answer.
+- multiple tool calls
+
+These all looks very simple and fun. But there comes scenarios where models fails to call a tool or calls an incorrect tools. We will see all that in one of the upcoming article. That is why it is very important to define tool/function defination clearly and define multiple tools with minimum ambiguty. 
