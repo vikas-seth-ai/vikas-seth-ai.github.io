@@ -25,11 +25,12 @@ description: >- # this means to ignore newlines until "baseurl:"
   and applied ML projects.
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "" # the base hostname & protocol for your site, e.g. http://example.com
-twitter_username: 
+twitter_username:
 github_username:  vikas-seth-ai
+linkedin_url: "" # add your LinkedIn URL here to make the link active
 
 # Build settings
-theme: minima
+# Custom theme lives in _layouts/, _includes/, and assets/css — no theme gem.
 plugins:
   - jekyll-feed
 

@@ -1,0 +1,19 @@
+<meta charset="utf-8">
+<script>
+  (function () {
+    try {
+      var stored = localStorage.getItem("theme");
+      if (stored === "light" || stored === "dark") {
+        document.documentElement.setAttribute("data-theme", stored);
+      }
+    } catch (e) {}
+  })();
+</script>
+<title>{% if page.title %}{{ page.title }} · {{ site.title }}{% else %}{{ site.title }}{% endif %}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="{{ page.excerpt | default: site.description | strip_html | strip_newlines | truncate: 160 }}">
+<link rel="canonical" href="{{ page.url | replace: 'index.html', '' | absolute_url }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230b0b0f'/><circle cx='50' cy='50' r='22' fill='%238f7bff'/></svg>">
+<link rel="stylesheet" href="{{ '/assets/css/main.css' | relative_url }}">
+<script src="{{ '/assets/js/theme.js' | relative_url }}" defer></script>
+{% feed_meta %}
