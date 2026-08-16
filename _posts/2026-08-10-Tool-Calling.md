@@ -12,7 +12,7 @@ Tool calling lets a language model request that a function be executed on its be
 
 
 ## 2. The basic mechanics of a tool call
-Let's see how a tool looks like and what do we send to the model and what comes back.
+Let's see what a tool looks like, what we send to the model, and what comes back.
 
 
 ```python
@@ -21,15 +21,15 @@ import ollama
 client = ollama.Client(host="http://192.168.5.168:11434")
 ```
 
-Our first tool - Let's create a Get Weather tool which model will call whenever we ask for weather information.
+Our first tool — let's create a Get Weather tool, which the model will call whenever we ask for weather information.
 ```python
 def get_weather(city: str) -> str:
     # This is a placeholder implementation. 
     # In a real scenario, you would call a weather API to get the actual weather data.
     return f"The weather in {city} is 22°C and sunny."
 ```
-But how do we let our model know that we have this tool available.
-We create a tools array, with the details of our function. Which also explains it type (function), name of the function (get_weather), description, parameters and properties of paramter. This specification is read my the model while determining which tool to use.
+But how do we let our model know that we have this tool available?
+We create a tools array with the details of our function, which explains its type (function), name of the function (get_weather), description, parameters, and properties of each parameter. This specification is read by the model while determining which tool to use.
 
 ```python
 tools = [
@@ -47,10 +47,11 @@ tools = [
             }
         }
     }
+]
 ```
 
 ### Passing Tools while calling model
-Here is a simple example how can we include a tool while calling a model
+Here is a simple example of how we can include a tool while calling a model:
 ```python
 response = client.chat(
     model="qwen2.5:7b",
@@ -60,11 +61,11 @@ response = client.chat(
 print(response["message"])
 ```
 
-Here along with the prompt we are also passing `tools` paramter. And what it returns is a *request* to call a specific tool with specific arguments.
+Along with the prompt, we are also passing the `tools` parameter. What it returns is a *request* to call a specific tool with specific arguments.
 ```
 role='assistant' content='' thinking=None images=None tool_name=None tool_calls=[ToolCall(function=Function(name='get_weather', arguments={'city': 'Berlin'}))]
 ```
-It returns which tool to call, like in this case `get_weather`, what arguments to pass `city = Berlin`.
+It returns which tool to call — in this case `get_weather` — and what arguments to pass, `city = Berlin`.
 
 Let's see a couple of variations.
 #### What happens when we don't pass `tools`
@@ -76,12 +77,12 @@ response = client.chat(
 print(response["message"])
 ```
 
-**Output**: It returns a regular output comging back from the model.
+**Output**: It returns a regular response from the model.
 ```
 role='assistant' content="I don't have real-time access to current weather conditions. As of my last update, I can suggest checking a reliable weather website or app for the most accurate and up-to-date information on the current weather in Berlin. Common sources include the Weather Channel, BBC Weather, or local German meteorological services." thinking=None images=None tool_name=None tool_calls=None
 ```
 
-#### What if we ask not weather related question and still pass `tools`.
+#### What if we ask a non-weather-related question and still pass `tools`?
 ```python
 response = client.chat(
     model="qwen2.5:7b",
@@ -91,7 +92,7 @@ response = client.chat(
 print(response["message"])
 ```
 
-**Output**: It gives us the answer, and tells us that no tools are available for this.
+**Output**: It gives us the answer, and tells us that no tools were used for this.
 
 ```
 role='assistant' content='The sum of 47 and 89 is 136.' thinking=None images=None tool_name=None tool_calls=None
@@ -100,9 +101,9 @@ role='assistant' content='The sum of 47 and 89 is 136.' thinking=None images=Non
 
 
 ## 3. Closing the loop — feeding results back
-Once model returns these results its responsibility of our code to make the tool can and feed the results back to the model. Let's see how it works.
+Once the model returns these results, it's our code's responsibility to call the tool and feed the results back to the model. Let's see how it works.
 
-We have alredy seen that model returns the `tool_calls` back with the details of function name and argument details. So, step 1 is we just simply calls that tool with the provided argument.
+We've already seen that the model returns `tool_calls` with the function name and argument details. So step 1 is simply to call that tool with the provided arguments.
 Here is a sample code for it:
 ```python
 for tool_call in response["message"]["tool_calls"]:
@@ -114,15 +115,15 @@ for tool_call in response["message"]["tool_calls"]:
             results = get_weather(city)
 ```
 
-After this we pass this back to Model to get final formatted natural sentenced answer. For example you might have asked two questions, so this way you get one answer from tool and one from model. So, our steps are:
-1. Ask model our questions by passing tools.
-2. Model returns list of tools.
-3. We call tools manually.
-4. We collect original quesion, model response, tool results and pass everything back to the model.
-5. Then model gives us back the final answer.
+After this, we pass it back to the model to get the final, naturally formatted answer. For example, you might have asked two questions, so this way you get one answer from the tool and one from the model. So, our steps are:
+1. Ask the model our question, passing the tools.
+2. Model returns the list of tool calls.
+3. We call the tools manually.
+4. We collect the original question, the model's response, and the tool results, and pass everything back to the model.
+5. Then the model gives us back the final answer.
 
 ```python
-# Step 1: As the question.
+# Step 1: Ask the question.
 question = "What is 47 plus 89? and how is weather in Tokyo?"
 
 response = client.chat(
@@ -131,7 +132,7 @@ response = client.chat(
     tools=tools
 )
 
-# Step 2: Model's first respons include tools (if there are any)
+# Step 2: Model's first response includes tools (if there are any)
 message = response["message"]
 
 # Build up the conversation history as we go (Part of Step 4)
@@ -171,7 +172,7 @@ For your math question, 47 plus 89 equals 136.
 
 
 ## 4. Multiple tool calls in one turn
-So, far we have seen a single tool call, but whatever we have learned so far can be easily modified to support multiple tool calls. To support this let's add anotehr simple tool `add_numbers`.
+So far, we've seen a single tool call, but everything we've learned so far can easily be extended to support multiple tool calls. To support this, let's add another simple tool, `add_numbers`.
 
 ```python
 def add_numbers(a: float, b: float) -> str:
@@ -213,7 +214,7 @@ tools = [
 ]
 ```
 
-Now if we repeat the same thing as what we did in the section "Closing the Loop" by just modifying tool calling loop with the following
+Now, if we repeat what we did in the "Closing the Loop" section, just modifying the tool-calling loop as follows:
 ```python
 # Execute each tool call and append its result
 for tool_call in message.tool_calls:
@@ -222,7 +223,7 @@ for tool_call in message.tool_calls:
     
     if name == "get_weather":
         result = get_weather(args["city"])
-    elif name == "add_numbers":    # << Here we have addded our 2nd tool >>
+    elif name == "add_numbers":    # << Here we've added our 2nd tool >>
             result = add_numbers(args["a"], args["b"])
     
     messages.append({"role": "tool", "content": result})
@@ -235,14 +236,14 @@ The sum of 47 and 89 is 136.
 Currently, the weather in Tokyo is 22°C and sunny.
 ```
 
-Note: It doesn't say anymore that "For your math question....". Becasue both results are not coming back from our tool calls.
+Note: It no longer says "For your math question…". Because both results are now coming back from our tool calls.
 
 
-So, what we saw here is a Model can:
+So what we saw here is that a model can:
 - determine when to use a tool.
 - determine which tool to use.
 - determine when not to use a tool.
 - also use a tool along with its own answer.
 - multiple tool calls
 
-These all looks very simple and fun. But there comes scenarios where models fails to call a tool or calls an incorrect tools. We will see all that in one of the upcoming article. That is why it is very important to define tool/function defination clearly and define multiple tools with minimum ambiguty. 
+This all looks very simple and fun, but there are scenarios where models fail to call a tool or call an incorrect tool. We'll see all of that in an upcoming article. That's why it's very important to define tool/function definitions clearly, and define multiple tools with minimal ambiguity.
