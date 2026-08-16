@@ -10,9 +10,6 @@ categories: tool-calling ollama ai-models llm
 ## 1. Why this write-up
 Tool calling lets a language model request that a function be executed on its behalf, rather than trying to compute or fabricate an answer itself. I wanted to actually build the full loop — not just read about it — using a local model running through Ollama. This covers the mechanics: how a tool call is requested, how you feed results back, and where structured output fits alongside it.
 
-Data points to reference:
-- Model: `qwen2.5:7b` for tool calling, `qwen2.5:14b-instruct` for structured output extraction, both via local Ollama.
-- Two toy tools used throughout: `get_weather(city)` and `add_numbers(a, b)`
 
 ## 2. The basic mechanics of a tool call
 Let's see how a tool looks like and what do we send to the model and what comes back.
